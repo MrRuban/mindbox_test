@@ -1,0 +1,59 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mindbox_test
+  labels:
+    name: mindbox_test
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+  name: mindbox_test
+  namespace: mindbox_test
+spec:
+#  replicas: 3 not marked explicitly, because I use HorizontalPodAutoscaler, according to this: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#replicas
+  progressDeadlineSeconds: 20   # I left a small reserve
+  selector:
+    matchLabels:
+      app: mindbox_test
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: mindbox_test
+    spec:
+      affinity:
+        podAntiAffinity:    # To distribute to different nodes
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - mindbox_test
+            topologyKey: "kubernetes.io/hostname"
+      containers:
+      - name: mindbox_test
+        image: mindbox_test:0.1.0
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "128Mi"         
+            
+---
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: mindbox_test
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: mindbox_test
+  minReplicas: 3    # One in each of the three zones
+  maxReplicas: 4    # It's enough for the peak load
+  targetCPUUtilizationPercentage: 50  
